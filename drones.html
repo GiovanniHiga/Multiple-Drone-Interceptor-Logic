@@ -1,157 +1,294 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simulación de Drones Interceptores</title>
+<title>AEGIS · Multi-Drone Intercept System</title>
 <style>
   :root {
-    --bg: #0a0e17;
-    --panel: #111827;
-    --border: #1f2b3d;
-    --accent: #22d3ee;
-    --danger: #f87171;
-    --ok: #4ade80;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
+    --bg: #0a0c0f;
+    --panel: #10141a;
+    --panel-2: #0c1015;
+    --border: #1e2630;
+    --border-strong: #303b49;
+    --accent: #6ab0ff;
+    --danger: #e5484d;
+    --ok: #46c98c;
+    --warn: #d9a13c;
+    --text: #d6dde6;
+    --muted: #7d8896;
+    --mono: "SF Mono", "Cascadia Code", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: var(--bg);
+    background: linear-gradient(180deg, #0c0f13 0%, var(--bg) 260px);
     color: var(--text);
-    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-family: var(--sans);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    padding: 24px 20px 40px;
+  }
+  .topbar {
+    width: 100%;
+    max-width: 948px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand .sys {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 5px;
   }
   h1 {
-    font-size: 18px;
-    letter-spacing: 3px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
-    color: var(--accent);
-    text-shadow: 0 0 12px rgba(34, 211, 238, .5);
-    margin-bottom: 16px;
   }
-  .layout { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+  .status {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ok);
+    border: 1px solid rgba(70, 201, 140, .35);
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: var(--ok);
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(70, 201, 140, .8);
+    animation: blink 2.4s ease-in-out infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+  .layout {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 20px;
+  }
   .canvas-wrap {
     position: relative;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 0 30px rgba(34, 211, 238, .12);
+    border: 1px solid var(--border-strong);
+    background: var(--panel-2);
     line-height: 0;
   }
-  canvas { display: block; background: radial-gradient(circle at 50% 85%, #0e1626 0%, #0a0e17 70%); }
+  .canvas-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .012) 0 1px, transparent 1px 3px);
+  }
+  .map-label {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .map-label b { color: var(--accent); font-weight: 400; }
+  canvas { display: block; background: radial-gradient(circle at 50% 90%, #0d1420 0%, var(--bg) 75%); }
   #banner {
     position: absolute;
     inset: 0;
     display: none;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
-    letter-spacing: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 6px;
+    text-transform: uppercase;
     color: var(--ok);
-    text-shadow: 0 0 16px rgba(74, 222, 128, .8);
-    background: rgba(10, 14, 23, .55);
+    background: rgba(10, 12, 15, .62);
     pointer-events: none;
   }
+  #banner::before, #banner::after {
+    content: "";
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    height: 1px;
+    background: currentColor;
+    opacity: .45;
+  }
+  #banner::before { top: 41%; }
+  #banner::after { bottom: 41%; }
+
   .panel {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
-    width: 250px;
+    padding: 18px;
+    width: 264px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
   }
-  .panel h2 { font-size: 12px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .panel h2 {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel h2::before {
+    content: "";
+    width: 8px;
+    height: 1px;
+    background: var(--accent);
+  }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .stat {
-    background: #0b1220;
+    background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    text-align: center;
+    padding: 10px 12px;
   }
-  .stat .value { font-size: 24px; font-weight: bold; }
-  .stat .label { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 4px; }
+  .stat.missiles { border-left: 2px solid var(--danger); }
+  .stat.drones { border-left: 2px solid var(--accent); }
+  .stat.intercept { border-left: 2px solid var(--ok); }
+  .stat.hits { border-left: 2px solid var(--warn); }
+  .stat .value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .label {
+    font-size: 8.5px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    margin-top: 5px;
+    text-transform: uppercase;
+  }
   .stat.missiles .value { color: var(--danger); }
   .stat.drones .value { color: var(--accent); }
   .stat.intercept .value { color: var(--ok); }
-  .stat.hits .value { color: #fbbf24; }
+  .stat.hits .value { color: var(--warn); }
+
   .controls { display: flex; flex-direction: column; gap: 10px; }
   .row { display: flex; gap: 8px; align-items: center; }
   button {
     flex: 1;
-    background: #0b1220;
+    background: var(--panel-2);
     color: var(--text);
-    border: 1px solid var(--accent);
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-family: inherit;
-    font-size: 12px;
+    border: 1px solid var(--border-strong);
+    padding: 9px 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: background .15s, box-shadow .15s;
+    transition: border-color .15s, color .15s, background .15s;
   }
-  button:hover { background: rgba(34, 211, 238, .15); box-shadow: 0 0 10px rgba(34, 211, 238, .3); }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { border-color: rgba(106, 176, 255, .5); color: var(--accent); }
+  button.primary:hover { background: rgba(106, 176, 255, .08); }
   input[type="text"] {
     width: 70px;
-    background: #0b1220;
+    background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
     color: var(--text);
-    padding: 7px 8px;
-    font-family: inherit;
-    font-size: 12px;
+    padding: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
   }
-  label.slider { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
-  input[type="range"] { width: 100%; accent-color: var(--accent); }
-  .hint { font-size: 10px; color: var(--muted); line-height: 1.6; }
+  input[type="text"]:focus, button:focus-visible { outline: none; border-color: var(--accent); }
+  label.slider {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  label.slider .slider-head { display: flex; justify-content: space-between; }
+  label.slider b { color: var(--text); font-weight: 400; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); height: 14px; }
+  .hint {
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.7;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
 </style>
 </head>
 <body>
 
-<h1>⚡ Drones Interceptores</h1>
+<header class="topbar">
+  <div class="brand">
+    <span class="sys">AEGIS // Air Defense</span>
+    <h1>Multi-Drone Intercept System</h1>
+  </div>
+  <div class="status">Operational</div>
+</header>
 
 <div class="layout">
   <div class="canvas-wrap">
     <canvas id="sim" width="640" height="640"></canvas>
-    <div id="banner">BASE PROTEGIDA</div>
+    <div class="map-label">SECTOR 7 · TACTICAL VIEW · <b>100 KM</b></div>
+    <div id="banner">BASE PROTECTED</div>
   </div>
 
   <div class="panel">
-    <h2>Estado</h2>
+    <h2>Sector Status</h2>
     <div class="stats">
-      <div class="stat missiles"><div class="value" id="sMissiles">6</div><div class="label">MISILES</div></div>
-      <div class="stat drones"><div class="value" id="sDrones">6</div><div class="label">DRONES</div></div>
-      <div class="stat intercept"><div class="value" id="sIntercept">0</div><div class="label">INTERCEPTADOS</div></div>
-      <div class="stat hits"><div class="value" id="sHits">0</div><div class="label">IMPACTOS BASE</div></div>
+      <div class="stat missiles"><div class="value" id="sMissiles">6</div><div class="label">Missiles</div></div>
+      <div class="stat drones"><div class="value" id="sDrones">6</div><div class="label">Drones</div></div>
+      <div class="stat intercept"><div class="value" id="sIntercept">0</div><div class="label">Intercepted</div></div>
+      <div class="stat hits"><div class="value" id="sHits">0</div><div class="label">Base Hits</div></div>
     </div>
 
-    <h2>Controles</h2>
+    <h2>Controls</h2>
     <div class="controls">
       <div class="row">
-        <button id="btnRestart">↻ REVENTAR</button>
-        <button id="btnPause">⏸ Pausar</button>
+        <button id="btnRestart" class="primary">Restart</button>
+        <button id="btnPause">Pause</button>
       </div>
       <div class="row">
-        <input type="text" id="seed" placeholder="seed">
-        <button id="btnSeed">Aplicar</button>
+        <input type="text" id="seed" placeholder="SEED">
+        <button id="btnSeed">Apply</button>
       </div>
-      <label class="slider">Velocidad <span id="speedVal">1×</span>
+      <label class="slider"><span class="slider-head">Speed <b id="speedVal">1×</b></span>
         <input type="range" id="speed" min="1" max="8" value="1">
       </label>
     </div>
 
     <p class="hint">
-      Cada dron calcula por sí mismo qué misil interceptar:
-      el dron más cercano a cada misil lo reclama (empate: menor ID).
-      Los drones apuntan al punto de interceptación predictiva y
-      se sacrifican al impactar. Sin objetivo, forman una barrera
-      defensiva frente a la base.
+      Each drone decides on its own which missile to intercept:
+      the drone closest to each missile claims it (tie: lowest ID).
+      Drones aim at the predictive intercept point and
+      sacrifice themselves on impact. With no target, they form a
+      defensive barrier in front of the base.
     </p>
   </div>
 </div>
@@ -159,7 +296,7 @@
 <script>
 "use strict";
 
-// ---------------- Parámetros (idénticos al script Python) ----------------
+// ---------------- Parameters (identical to the Python script) ----------------
 const N_DRONES = 6;
 const N_MISSILES = 6;
 const WORLD = 100.0;
@@ -169,6 +306,9 @@ const KILL_RADIUS = 2.0;
 const BASE_POS = { x: 50, y: 5 };
 const REASSIGN_EVERY = 2;
 const FORMATION_GAP = 6.0;
+
+// Simulation pacing: 20 ticks/s (was 60), ~3x slower, more deliberate motion
+const TICK_MS = 50;
 
 // ---------------- RNG con semilla (mulberry32) ----------------
 let rng = mulberry32((Math.random() * 2 ** 31) | 0);
@@ -199,7 +339,7 @@ class Missile {
     if (this.trail.length > 30) this.trail.shift();
     if (Math.hypot(BASE_POS.x - this.pos.x, BASE_POS.y - this.pos.y) < 1.0) {
       this.alive = false;
-      spawnExplosion(this.pos, "#f87171", 28); // impactó la base
+      spawnExplosion(this.pos, "#e5484d", 28); // hit the base
       stats.hits++;
     }
   }
@@ -220,11 +360,11 @@ class Drone {
       const dx = aim.x - this.pos.x, dy = aim.y - this.pos.y;
       const d = Math.hypot(dx, dy);
       if (d <= KILL_RADIUS) {
-        // Interceptación: misil y dron se destruyen
+        // Interception: missile and drone are destroyed
         this.target.alive = false;
         this.alive = false;
         this.target = null;
-        spawnExplosion(this.pos, "#4ade80", 24);
+        spawnExplosion(this.pos, "#46c98c", 24);
         stats.intercept++;
       } else if (d > 0) {
         this.pos.x += dx / d * DRONE_SPEED;
@@ -246,7 +386,7 @@ class Drone {
   }
 }
 
-// Punto futuro donde el dron corta el paso al misil (|r + v·t| = s·t)
+// Future point where the drone cuts off the missile (|r + v·t| = s·t)
 function interceptPoint(p, m) {
   const rx = m.pos.x - p.x, ry = m.pos.y - p.y;
   const vx = m.vel.x, vy = m.vel.y;
@@ -311,7 +451,7 @@ function assign() {
   }
 }
 
-// ---------------- Partículas (explosiones) ----------------
+// ---------------- Particles (explosions) ----------------
 let particles = [];
 function spawnExplosion(pos, color, n) {
   for (let i = 0; i < n; i++) {
@@ -366,12 +506,12 @@ function step() {
   frame++;
 
   if (missiles.every(m => !m.alive)) {
-    banner.textContent = stats.hits === 0 ? "BASE PROTEGIDA"
-      : `SIMULACIÓN TERMINADA — ${stats.hits} IMPACTO(S)`;
+    banner.textContent = stats.hits === 0 ? "BASE PROTECTED"
+      : `SIMULATION COMPLETE — ${stats.hits} BASE HIT(S)`;
     banner.style.color = stats.hits === 0 ? "var(--ok)" : "var(--danger)";
     banner.style.display = "flex";
     paused = true;
-    btnPause.textContent = "▶ Reanudar";
+    btnPause.textContent = "Resume";
   }
   updateStatsUI();
 }
@@ -382,17 +522,17 @@ const ctx = canvas.getContext("2d");
 const banner = document.getElementById("banner");
 const S = canvas.width;
 const px = x => x / WORLD * S;
-const py = y => S - y / WORLD * S; // mundo con Y hacia arriba
+const py = y => S - y / WORLD * S; // world with Y pointing up
 
 function drawGrid() {
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.07)";
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.06)";
   ctx.lineWidth = 1;
   for (let i = 0; i <= WORLD; i += 10) {
     ctx.beginPath(); ctx.moveTo(px(i), 0); ctx.lineTo(px(i), S); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, py(i)); ctx.lineTo(S, py(i)); ctx.stroke();
   }
-  // Anillos radar alrededor de la base
-  ctx.strokeStyle = "rgba(74, 222, 128, 0.10)";
+  // Radar rings around the base
+  ctx.strokeStyle = "rgba(70, 201, 140, 0.10)";
   for (const r of [10, 20, 30]) {
     ctx.beginPath();
     ctx.arc(px(BASE_POS.x), py(BASE_POS.y), px(r), 0, Math.PI * 2);
@@ -400,20 +540,42 @@ function drawGrid() {
   }
 }
 
+let sweep = 0;
+function drawRadarSweep() {
+  sweep += 0.004;
+  const x = px(BASE_POS.x), y = py(BASE_POS.y);
+  const R = px(32);
+  const grad = ctx.createRadialGradient(x, y, 0, x, y, R);
+  grad.addColorStop(0, "rgba(106, 176, 255, 0.09)");
+  grad.addColorStop(1, "rgba(106, 176, 255, 0)");
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, R, sweep, sweep + 0.55);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = "rgba(106, 176, 255, 0.28)";
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + Math.cos(sweep) * R, y + Math.sin(sweep) * R);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawBase() {
   const x = px(BASE_POS.x), y = py(BASE_POS.y);
   const r = px(2.2);
   ctx.save();
-  ctx.shadowColor = "#4ade80"; ctx.shadowBlur = 18;
-  ctx.fillStyle = "#14532d";
+  ctx.shadowColor = "#46c98c"; ctx.shadowBlur = 10;
+  ctx.fillStyle = "#123524";
   ctx.fillRect(x - r, y - r, r * 2, r * 2);
   ctx.restore();
-  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 2;
+  ctx.strokeStyle = "#46c98c"; ctx.lineWidth = 1.5;
   ctx.strokeRect(x - r, y - r, r * 2, r * 2);
-  ctx.fillStyle = "#4ade80";
-  ctx.font = "10px monospace"; ctx.textAlign = "center";
-  ctx.fillText("BASE", x, y + r + 12);
-}
+  ctx.fillStyle = "#46c98c";
+  ctx.font = "9px monospace"; ctx.textAlign = "center";
+  ctx.fillText("BASE", x, y + r + 11);}
 
 function drawTrail(trail, color) {
   if (trail.length < 2) return;
@@ -431,13 +593,24 @@ function drawTrail(trail, color) {
 }
 
 function drawMissiles() {
+  const targeted = new Set(
+    drones.filter(d => d.alive && d.target !== null && d.target.alive).map(d => d.target)
+  );
   for (const m of missiles) {
     if (!m.alive) continue;
-    drawTrail(m.trail, "#f87171");
+    drawTrail(m.trail, "#e5484d");
     const x = px(m.pos.x), y = py(m.pos.y);
+    if (targeted.has(m)) {
+      // Target designation ring
+      ctx.strokeStyle = "rgba(229, 72, 77, 0.55)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.save();
-    ctx.shadowColor = "#f87171"; ctx.shadowBlur = 12;
-    ctx.fillStyle = "#ef4444";
+    ctx.shadowColor = "#e5484d"; ctx.shadowBlur = 8;
+    ctx.fillStyle = "#e5484d";
     ctx.beginPath();
     ctx.moveTo(x, y - 7); ctx.lineTo(x - 5, y + 5); ctx.lineTo(x + 5, y + 5);
     ctx.closePath(); ctx.fill();
@@ -448,10 +621,10 @@ function drawMissiles() {
 function drawDrones() {
   for (const d of drones) {
     if (!d.alive) continue;
-    // Línea punteada hacia el objetivo
+    // Dashed line to target
     if (d.target !== null && d.target.alive) {
       ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = "rgba(34, 211, 238, 0.35)";
+      ctx.strokeStyle = "rgba(106, 176, 255, 0.35)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(px(d.pos.x), py(d.pos.y));
@@ -459,16 +632,16 @@ function drawDrones() {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    drawTrail(d.trail, "#22d3ee");
+    drawTrail(d.trail, "#6ab0ff");
     const x = px(d.pos.x), y = py(d.pos.y);
     ctx.save();
-    ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 14;
-    ctx.fillStyle = "#22d3ee";
+    ctx.shadowColor = "#6ab0ff"; ctx.shadowBlur = 8;
+    ctx.fillStyle = "#6ab0ff";
     ctx.beginPath();
     ctx.moveTo(x, y - 7); ctx.lineTo(x - 6, y + 5); ctx.lineTo(x + 6, y + 5);
     ctx.closePath(); ctx.fill();
     ctx.restore();
-    ctx.fillStyle = "#e2e8f0";
+    ctx.fillStyle = "#d6dde6";
     ctx.font = "9px monospace"; ctx.textAlign = "left";
     ctx.fillText(d.id, x + 7, y + 3);
   }
@@ -488,6 +661,7 @@ function drawParticles() {
 function draw() {
   ctx.clearRect(0, 0, S, S);
   drawGrid();
+  drawRadarSweep();
   drawBase();
   drawMissiles();
   drawDrones();
@@ -510,15 +684,15 @@ function updateStatsUI() {
 const btnPause = document.getElementById("btnPause");
 btnPause.addEventListener("click", () => {
   paused = !paused;
-  btnPause.textContent = paused ? "▶ Reanudar" : "⏸ Pausar";
+  btnPause.textContent = paused ? "Resume" : "Pause";
 });
 document.getElementById("btnRestart").addEventListener("click", () => {
   init(document.getElementById("seed").value);
-  if (paused) { paused = false; btnPause.textContent = "⏸ Pausar"; }
+  if (paused) { paused = false; btnPause.textContent = "Pause"; }
 });
 document.getElementById("btnSeed").addEventListener("click", () => {
   init(document.getElementById("seed").value);
-  if (paused) { paused = false; btnPause.textContent = "⏸ Pausar"; }
+  if (paused) { paused = false; btnPause.textContent = "Pause"; }
 });
 const speedInput = document.getElementById("speed");
 speedInput.addEventListener("input", () => {
@@ -527,16 +701,25 @@ speedInput.addEventListener("input", () => {
 });
 
 // ---------------- Bucle principal ----------------
-function loop() {
+// Time accumulator: the simulation advances TICK_MS per tick,
+// independent of the browser's frame rate.
+let lastT = performance.now(), acc = 0;
+function loop(now) {
+  const dt = Math.min(now - lastT, 250);
+  lastT = now;
   if (!paused) {
-    for (let i = 0; i < speed; i++) step();
+    acc += dt;
+    while (acc >= TICK_MS) {
+      for (let i = 0; i < speed; i++) step();
+      acc -= TICK_MS;
+    }
   }
   draw();
   requestAnimationFrame(loop);
 }
 
 init();
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
