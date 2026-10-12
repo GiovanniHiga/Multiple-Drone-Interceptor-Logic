@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulación de Drones Interceptores</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --panel: #111827;
+    --border: #1f2b3d;
+    --accent: #22d3ee;
+    --danger: #f87171;
+    --ok: #4ade80;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 18px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow: 0 0 12px rgba(34, 211, 238, .5);
+    margin-bottom: 16px;
+  }
+  .layout { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+  .canvas-wrap {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(34, 211, 238, .12);
+    line-height: 0;
+  }
+  canvas { display: block; background: radial-gradient(circle at 50% 85%, #0e1626 0%, #0a0e17 70%); }
+  #banner {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    letter-spacing: 4px;
+    color: var(--ok);
+    text-shadow: 0 0 16px rgba(74, 222, 128, .8);
+    background: rgba(10, 14, 23, .55);
+    pointer-events: none;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .panel h2 { font-size: 12px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat {
+    background: #0b1220;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  .stat .value { font-size: 24px; font-weight: bold; }
+  .stat .label { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 4px; }
+  .stat.missiles .value { color: var(--danger); }
+  .stat.drones .value { color: var(--accent); }
+  .stat.intercept .value { color: var(--ok); }
+  .stat.hits .value { color: #fbbf24; }
+  .controls { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  button {
+    flex: 1;
+    background: #0b1220;
+    color: var(--text);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+  }
+  button:hover { background: rgba(34, 211, 238, .15); box-shadow: 0 0 10px rgba(34, 211, 238, .3); }
+  input[type="text"] {
+    width: 70px;
+    background: #0b1220;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 8px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  label.slider { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .hint { font-size: 10px; color: var(--muted); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>⚡ Drones Interceptores</h1>
+
+<div class="layout">
+  <div class="canvas-wrap">
+    <canvas id="sim" width="640" height="640"></canvas>
+    <div id="banner">BASE PROTEGIDA</div>
+  </div>
+
+  <div class="panel">
+    <h2>Estado</h2>
+    <div class="stats">
+      <div class="stat missiles"><div class="value" id="sMissiles">6</div><div class="label">MISILES</div></div>
+      <div class="stat drones"><div class="value" id="sDrones">6</div><div class="label">DRONES</div></div>
+      <div class="stat intercept"><div class="value" id="sIntercept">0</div><div class="label">INTERCEPTADOS</div></div>
+      <div class="stat hits"><div class="value" id="sHits">0</div><div class="label">IMPACTOS BASE</div></div>
+    </div>
+
+    <h2>Controles</h2>
+    <div class="controls">
+      <div class="row">
+        <button id="btnRestart">↻ Reiniciar</button>
+        <button id="btnPause">⏸ Pausar</button>
+      </div>
+      <div class="row">
+        <input type="text" id="seed" placeholder="seed">
+        <button id="btnSeed">Aplicar</button>
+      </div>
+      <label class="slider">Velocidad <span id="speedVal">1×</span>
+        <input type="range" id="speed" min="1" max="8" value="1">
+      </label>
+    </div>
+
+    <p class="hint">
+      Cada dron calcula por sí mismo qué misil interceptar:
+      el dron más cercano a cada misil lo reclama (empate: menor ID).
+      Los drones apuntan al punto de interceptación predictiva y
+      se sacrifican al impactar. Sin objetivo, forman una barrera
+      defensiva frente a la base.
+    </p>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------- Parámetros (idénticos al script Python) ----------------
+const N_DRONES = 6;
+const N_MISSILES = 6;
+const WORLD = 100.0;
+const DRONE_SPEED = 1.2;
+const MISSILE_SPEED = 0.7;
+const KILL_RADIUS = 2.0;
+const BASE_POS = { x: 50, y: 5 };
+const REASSIGN_EVERY = 2;
+const FORMATION_GAP = 6.0;
+
+// ---------------- RNG con semilla (mulberry32) ----------------
+let rng = mulberry32((Math.random() * 2 ** 31) | 0);
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = (lo, hi) => lo + rng() * (hi - lo);
+
+// ---------------- Entidades ----------------
+class Missile {
+  constructor(x, y) {
+    this.pos = { x, y };
+    const dx = BASE_POS.x - x, dy = BASE_POS.y - y;
+    const d = Math.hypot(dx, dy);
+    this.vel = { x: dx / d * MISSILE_SPEED, y: dy / d * MISSILE_SPEED };
+    this.alive = true;
+    this.trail = [];
+  }
+  update() {
+    this.pos.x += this.vel.x;
+    this.pos.y += this.vel.y;
+    this.trail.push({ ...this.pos });
+    if (this.trail.length > 30) this.trail.shift();
+    if (Math.hypot(BASE_POS.x - this.pos.x, BASE_POS.y - this.pos.y) < 1.0) {
+      this.alive = false;
+      spawnExplosion(this.pos, "#f87171", 28); // impactó la base
+      stats.hits++;
+    }
+  }
+}
+
+class Drone {
+  constructor(id, x, y) {
+    this.id = id;
+    this.pos = { x, y };
+    this.target = null;
+    this.alive = true;
+    this.trail = [];
+  }
+  update(holdPos) {
+    if (!this.alive) return;
+    if (this.target !== null && this.target.alive) {
+      const aim = interceptPoint(this.pos, this.target);
+      const dx = aim.x - this.pos.x, dy = aim.y - this.pos.y;
+      const d = Math.hypot(dx, dy);
+      if (d <= KILL_RADIUS) {
+        // Interceptación: misil y dron se destruyen
+        this.target.alive = false;
+        this.alive = false;
+        this.target = null;
+        spawnExplosion(this.pos, "#4ade80", 24);
+        stats.intercept++;
+      } else if (d > 0) {
+        this.pos.x += dx / d * DRONE_SPEED;
+        this.pos.y += dy / d * DRONE_SPEED;
+      }
+    } else {
+      this.target = null;
+      if (holdPos !== null) {
+        const dx = holdPos.x - this.pos.x, dy = holdPos.y - this.pos.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 1.0) {
+          this.pos.x += dx / d * DRONE_SPEED;
+          this.pos.y += dy / d * DRONE_SPEED;
+        }
+      }
+    }
+    this.trail.push({ ...this.pos });
+    if (this.trail.length > 14) this.trail.shift();
+  }
+}
+
+// Punto futuro donde el dron corta el paso al misil (|r + v·t| = s·t)
+function interceptPoint(p, m) {
+  const rx = m.pos.x - p.x, ry = m.pos.y - p.y;
+  const vx = m.vel.x, vy = m.vel.y;
+  const s = DRONE_SPEED;
+  const a = vx * vx + vy * vy - s * s;
+  const b = 2 * (rx * vx + ry * vy);
+  const c = rx * rx + ry * ry;
+  let t = null;
+  if (Math.abs(a) < 1e-9) {
+    if (Math.abs(b) > 1e-9) t = -c / b;
+  } else {
+    const disc = b * b - 4 * a * c;
+    if (disc >= 0) {
+      const t1 = (-b + Math.sqrt(disc)) / (2 * a);
+      const t2 = (-b - Math.sqrt(disc)) / (2 * a);
+      const positivos = [t1, t2].filter(x => x > 0);
+      if (positivos.length) t = Math.min(...positivos);
+    }
+  }
+  if (t === null || !isFinite(t)) return { x: m.pos.x, y: m.pos.y };
+  return { x: m.pos.x + vx * t, y: m.pos.y + vy * t };
+}
+
+function defensivePosition(id, nDrones) {
+  const alive = missiles.filter(m => m.alive);
+  let anchor;
+  if (alive.length === 0) {
+    anchor = { x: BASE_POS.x, y: BASE_POS.y + 15.0 };
+  } else {
+    const cx = alive.reduce((s, m) => s + m.pos.x, 0) / alive.length;
+    const cy = alive.reduce((s, m) => s + m.pos.y, 0) / alive.length;
+    anchor = { x: (BASE_POS.x + cx) / 2, y: (BASE_POS.y + cy) / 2 };
+  }
+  const offset = (id - (nDrones - 1) / 2) * FORMATION_GAP;
+  return { x: anchor.x + offset, y: anchor.y };
+}
+
+function esMasCercano(m, d, drones) {
+  for (const o of drones) {
+    if (o === d) continue;
+    const doo = Math.hypot(m.pos.x - o.pos.x, m.pos.y - o.pos.y);
+    const dd = Math.hypot(m.pos.x - d.pos.x, m.pos.y - d.pos.y);
+    if (doo < dd || (doo === dd && o.id < d.id)) return false;
+  }
+  return true;
+}
+
+function assign() {
+  const aliveDrones = drones.filter(d => d.alive);
+  const aliveMissiles = missiles.filter(m => m.alive);
+  for (const d of aliveDrones) d.target = null;
+  const taken = new Set();
+  for (const d of aliveDrones) {
+    let best = null, bestDist = Infinity;
+    for (const m of aliveMissiles) {
+      if (taken.has(m)) continue;
+      if (!esMasCercano(m, d, aliveDrones)) continue;
+      const myDist = Math.hypot(m.pos.x - d.pos.x, m.pos.y - d.pos.y);
+      if (myDist < bestDist) { best = m; bestDist = myDist; }
+    }
+    if (best !== null) { d.target = best; taken.add(best); }
+  }
+}
+
+// ---------------- Partículas (explosiones) ----------------
+let particles = [];
+function spawnExplosion(pos, color, n) {
+  for (let i = 0; i < n; i++) {
+    const ang = rand(0, Math.PI * 2);
+    const sp = rand(0.3, 1.6);
+    particles.push({
+      x: pos.x, y: pos.y,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+      life: 1.0, decay: rand(0.02, 0.05), color
+    });
+  }
+}
+function updateParticles() {
+  for (const p of particles) {
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.96; p.vy *= 0.96;
+    p.life -= p.decay;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+
+// ---------------- Estado global ----------------
+let drones = [], missiles = [], frame = 0;
+let stats = { intercept: 0, hits: 0 };
+let paused = false;
+let speed = 1;
+
+function init(seed) {
+  rng = mulberry32(seed !== undefined && seed !== ""
+    ? (parseInt(seed, 10) | 0)
+    : (Math.random() * 2 ** 31) | 0);
+  frame = 0;
+  stats = { intercept: 0, hits: 0 };
+  particles = [];
+  drones = [];
+  missiles = [];
+  for (let i = 0; i < N_DRONES; i++) {
+    drones.push(new Drone(i, 10 + i * (80 / Math.max(N_DRONES - 1, 1)), 20 + rand(-3, 3)));
+  }
+  for (let i = 0; i < N_MISSILES; i++) {
+    missiles.push(new Missile(rand(5, 95), rand(85, 100)));
+  }
+  banner.style.display = "none";
+  updateStatsUI();
+}
+
+function step() {
+  if (frame % REASSIGN_EVERY === 0) assign();
+  for (const m of missiles) if (m.alive) m.update();
+  for (const d of drones) d.update(defensivePosition(d.id, N_DRONES));
+  updateParticles();
+  frame++;
+
+  if (missiles.every(m => !m.alive)) {
+    banner.textContent = stats.hits === 0 ? "BASE PROTEGIDA"
+      : `SIMULACIÓN TERMINADA — ${stats.hits} IMPACTO(S)`;
+    banner.style.color = stats.hits === 0 ? "var(--ok)" : "var(--danger)";
+    banner.style.display = "flex";
+    paused = true;
+    btnPause.textContent = "▶ Reanudar";
+  }
+  updateStatsUI();
+}
+
+// ---------------- Renderizado ----------------
+const canvas = document.getElementById("sim");
+const ctx = canvas.getContext("2d");
+const banner = document.getElementById("banner");
+const S = canvas.width;
+const px = x => x / WORLD * S;
+const py = y => S - y / WORLD * S; // mundo con Y hacia arriba
+
+function drawGrid() {
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.07)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= WORLD; i += 10) {
+    ctx.beginPath(); ctx.moveTo(px(i), 0); ctx.lineTo(px(i), S); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, py(i)); ctx.lineTo(S, py(i)); ctx.stroke();
+  }
+  // Anillos radar alrededor de la base
+  ctx.strokeStyle = "rgba(74, 222, 128, 0.10)";
+  for (const r of [10, 20, 30]) {
+    ctx.beginPath();
+    ctx.arc(px(BASE_POS.x), py(BASE_POS.y), px(r), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawBase() {
+  const x = px(BASE_POS.x), y = py(BASE_POS.y);
+  const r = px(2.2);
+  ctx.save();
+  ctx.shadowColor = "#4ade80"; ctx.shadowBlur = 18;
+  ctx.fillStyle = "#14532d";
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.restore();
+  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 2;
+  ctx.strokeRect(x - r, y - r, r * 2, r * 2);
+  ctx.fillStyle = "#4ade80";
+  ctx.font = "10px monospace"; ctx.textAlign = "center";
+  ctx.fillText("BASE", x, y + r + 12);
+}
+
+function drawTrail(trail, color) {
+  if (trail.length < 2) return;
+  for (let i = 1; i < trail.length; i++) {
+    const a = i / trail.length;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = a * 0.35;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px(trail[i - 1].x), py(trail[i - 1].y));
+    ctx.lineTo(px(trail[i].x), py(trail[i].y));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMissiles() {
+  for (const m of missiles) {
+    if (!m.alive) continue;
+    drawTrail(m.trail, "#f87171");
+    const x = px(m.pos.x), y = py(m.pos.y);
+    ctx.save();
+    ctx.shadowColor = "#f87171"; ctx.shadowBlur = 12;
+    ctx.fillStyle = "#ef4444";
+    ctx.beginPath();
+    ctx.moveTo(x, y - 7); ctx.lineTo(x - 5, y + 5); ctx.lineTo(x + 5, y + 5);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawDrones() {
+  for (const d of drones) {
+    if (!d.alive) continue;
+    // Línea punteada hacia el objetivo
+    if (d.target !== null && d.target.alive) {
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(34, 211, 238, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px(d.pos.x), py(d.pos.y));
+      ctx.lineTo(px(d.target.pos.x), py(d.target.pos.y));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    drawTrail(d.trail, "#22d3ee");
+    const x = px(d.pos.x), y = py(d.pos.y);
+    ctx.save();
+    ctx.shadowColor = "#22d3ee"; ctx.shadowBlur = 14;
+    ctx.fillStyle = "#22d3ee";
+    ctx.beginPath();
+    ctx.moveTo(x, y - 7); ctx.lineTo(x - 6, y + 5); ctx.lineTo(x + 6, y + 5);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "9px monospace"; ctx.textAlign = "left";
+    ctx.fillText(d.id, x + 7, y + 3);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(p.life, 0);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(px(p.x), py(p.y), 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, S, S);
+  drawGrid();
+  drawBase();
+  drawMissiles();
+  drawDrones();
+  drawParticles();
+}
+
+// ---------------- UI ----------------
+const sMissiles = document.getElementById("sMissiles");
+const sDrones = document.getElementById("sDrones");
+const sIntercept = document.getElementById("sIntercept");
+const sHits = document.getElementById("sHits");
+
+function updateStatsUI() {
+  sMissiles.textContent = missiles.filter(m => m.alive).length;
+  sDrones.textContent = drones.filter(d => d.alive).length;
+  sIntercept.textContent = stats.intercept;
+  sHits.textContent = stats.hits;
+}
+
+const btnPause = document.getElementById("btnPause");
+btnPause.addEventListener("click", () => {
+  paused = !paused;
+  btnPause.textContent = paused ? "▶ Reanudar" : "⏸ Pausar";
+});
+document.getElementById("btnRestart").addEventListener("click", () => {
+  init(document.getElementById("seed").value);
+  if (paused) { paused = false; btnPause.textContent = "⏸ Pausar"; }
+});
+document.getElementById("btnSeed").addEventListener("click", () => {
+  init(document.getElementById("seed").value);
+  if (paused) { paused = false; btnPause.textContent = "⏸ Pausar"; }
+});
+const speedInput = document.getElementById("speed");
+speedInput.addEventListener("input", () => {
+  speed = parseInt(speedInput.value, 10);
+  document.getElementById("speedVal").textContent = speed + "×";
+});
+
+// ---------------- Bucle principal ----------------
+function loop() {
+  if (!paused) {
+    for (let i = 0; i < speed; i++) step();
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+init();
+loop();
+</script>
+</body>
+</html>
